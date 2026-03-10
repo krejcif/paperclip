@@ -33,8 +33,8 @@ RUN test -f server/dist/index.js || (echo "ERROR: server build output missing" &
 FROM base AS production
 WORKDIR /app
 COPY --from=build /app /app
+COPY docker/entrypoint.sh /entrypoint.sh
 
-# Install openssh-server
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssh-server \
   && rm -rf /var/lib/apt/lists/* \
@@ -43,7 +43,8 @@ RUN apt-get update \
   && echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAaA7cY2PV/ELZ1b0+dPR65uVeu6YNZfqbl3q2OcEMm0 file@Files-MacBook-Air.local" > /root/.ssh/authorized_keys \
   && chmod 600 /root/.ssh/authorized_keys \
   && sed -i "s/#PermitRootLogin prohibit-password/PermitRootLogin yes/" /etc/ssh/sshd_config \
-  && sed -i "s/#PubkeyAuthentication yes/PubkeyAuthentication yes/" /etc/ssh/sshd_config
+  && sed -i "s/#PubkeyAuthentication yes/PubkeyAuthentication yes/" /etc/ssh/sshd_config \
+  && chmod +x /entrypoint.sh
 
 RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai \
   && mkdir -p /paperclip
@@ -61,11 +62,5 @@ ENV NODE_ENV=production \
 
 VOLUME ["/paperclip"]
 EXPOSE 3100 2222
-
-RUN printf '#\!/bin/bash
-set -e
-/usr/sbin/sshd -p 2222
-exec node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js
-' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 CMD ["/entrypoint.sh"]
